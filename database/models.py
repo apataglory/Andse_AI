@@ -60,25 +60,25 @@ class ChatSession(db.Model):
     messages = db.relationship('Message', backref='session', lazy='dynamic', cascade="all, delete-orphan")
 
 class Message(db.Model):
+    """
+    Renamed from ChatMessage to Message to align with session logic, 
+    but we will alias it in app.py to prevent import errors.
+    """
     __tablename__ = 'messages'
     id = db.Column(db.Integer, primary_key=True)
     session_id = db.Column(db.Integer, db.ForeignKey('chat_sessions.id'), nullable=False)
-    role = db.Column(db.String(20), nullable=False) 
+    role = db.Column(db.String(20), nullable=False) # 'user', 'assistant', 'system'
     content = db.Column(db.Text, nullable=False)
     model_used = db.Column(db.String(50), nullable=True)
     tokens_count = db.Column(db.Integer, default=0)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
 class FileMetadata(db.Model):
-    """
-    NEURAL ASSETS:
-    Tracks files uploaded for analysis or storage.
-    """
     __tablename__ = 'file_metadata'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     filename = db.Column(db.String(255), nullable=False)
     file_type = db.Column(db.String(50))
-    file_size = db.Column(db.Integer) # In bytes
+    file_size = db.Column(db.Integer)
     storage_path = db.Column(db.String(500))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
