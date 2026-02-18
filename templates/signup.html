@@ -180,7 +180,7 @@
             {% endif %}
         {% endwith %}
 
-        <form method="POST">
+        <form method="POST" action="{{ url_for('auth.signup') }}">
             <div class="input-group">
                 <label>CORE EMAIL</label>
                 <input type="email" name="email" placeholder="agent@andse.ai" required>
@@ -198,4 +198,3 @@
     </div>
 </body>
 </html>
-
