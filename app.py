@@ -20,7 +20,7 @@ sys.path.append(os.getcwd())
 
 # --- 3. IMPORT EXTENSIONS & MODELS ---
 from extensions import db, socketio, mail
-from database.models import User
+from database.models import User # Ensure User is imported so SQLAlchemy sees it
 
 # --- 4. THE MASSIVE FEATURE IMPORT ENGINE ---
 def safe_import(module_name, blueprint_name=None):
@@ -56,10 +56,6 @@ except ImportError:
 
 # --- 5. ENVIRONMENT CONFIG ---
 load_dotenv()
-
-# Set OAUTHLIB_INSECURE_TRANSPORT to 1 for local testing, Render will ignore this if using HTTPS
-if os.getenv('FLASK_ENV') == 'development':
-    os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 logging.basicConfig(
     level=logging.INFO,
@@ -98,7 +94,6 @@ def create_app():
         MAIL_PASSWORD=os.getenv('MAIL_PASSWORD')
     )
 
-    # ProxyFix is essential for Redirect URIs on Render
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
     # ==========================================
@@ -108,9 +103,7 @@ def create_app():
         app.config['UPLOAD_FOLDER'],
         app.config['IMAGE_GEN_FOLDER'],
         app.config['AUDIO_CACHE'],
-        app.config['VIDEO_CACHE'],
-        os.path.join(app.config['UPLOAD_FOLDER'], 'docs'),
-        os.path.join(app.config['UPLOAD_FOLDER'], 'temp')
+        app.config['VIDEO_CACHE']
     ]
     for directory in directories:
         os.makedirs(directory, exist_ok=True)
@@ -133,15 +126,11 @@ def create_app():
 
     @login_manager.user_loader
     def load_user(user_id):
-        try:
-            return db.session.get(User, int(user_id))
-        except Exception:
-            return None
+        return db.session.get(User, int(user_id))
 
     # ==========================================
     # 10. REGISTER ALL BLUEPRINTS
     # ==========================================
-    # Configure OAuth AFTER app.config is populated
     configure_oauth(app)
     
     blueprints = [
@@ -158,8 +147,15 @@ def create_app():
         if bp:
             app.register_blueprint(bp, url_prefix=prefix)
             logger.info(f"✅ Feature Active: {prefix}")
-        elif prefix == '/auth':
-            logger.error("CRITICAL ERROR: Auth blueprint is missing!")
+
+    # --- MANDATORY: DATABASE TABLE CREATION ---
+    with app.app_context():
+        try:
+            logger.info("🛠️ Building Neural Database Tables...")
+            db.create_all()
+            logger.info("✅ Database Ready.")
+        except Exception as e:
+            logger.error(f"❌ Database Creation Failed: {e}")
 
     # ==========================================
     # 11. GLOBAL CORE ROUTES
@@ -167,36 +163,17 @@ def create_app():
     @app.route('/')
     def index():
         if current_user.is_authenticated:
-            # Check if chat_bp was actually loaded before redirecting
-            if chat_bp:
-                return redirect(url_for('chat.interface'))
-            return "Chat module not loaded", 503
+            return redirect(url_for('chat.interface'))
         return render_template('login.html')
 
     @app.route('/system/status')
     def status():
-        return jsonify({
-            "status": "online",
-            "modules": {
-                "vision": bool(image_bp),
-                "video": bool(video_bp),
-                "scraper": bool(scraper_bp),
-                "auth": bool(auth_bp)
-            }
-        })
+        return jsonify({"status": "online", "db": "connected"})
 
     return app
 
 app = create_app()
 
 if __name__ == '__main__':
-    with app.app_context():
-        try:
-            db.create_all()
-        except Exception as e:
-            logger.warning(f"DB Init Note: {e}")
-    
-    # FIXED: Safe Port handling to prevent crash on local/Render
-    port = int(os.environ.get("PORT", 5000))
-    # Note: Use socketio.run instead of app.run for Socket.IO features
+    port = int(os.environ.get("PORT", 10000))
     socketio.run(app, host="0.0.0.0", port=port, debug=True)
