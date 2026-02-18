@@ -16,7 +16,6 @@ from dotenv import load_dotenv
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 # --- 2. SYSTEM PATH CONFIGURATION ---
-# Ensures Python finds modules in the root directory
 sys.path.append(os.getcwd())
 
 # --- 3. IMPORT EXTENSIONS & MODELS ---
@@ -24,21 +23,17 @@ from extensions import db, socketio, mail
 from database.models import User
 
 # --- 4. THE MASSIVE FEATURE IMPORT ENGINE ---
-# This logic attempts to load modules from root OR subfolders to prevent crashes
 def safe_import(module_name, blueprint_name=None):
     try:
-        # Try direct import (e.g. 'import chat_manager')
         mod = __import__(module_name, fromlist=[blueprint_name] if blueprint_name else [])
         return getattr(mod, blueprint_name) if blueprint_name else mod
     except ImportError:
         try:
-            # Try package import (e.g. 'import chat.chat_manager')
-            # This handles cases where files are moved into folders
             if module_name == 'chat_manager':
                 from chat import chat_manager as mod
             elif module_name == 'webscraper':
-                from webscraper import web_searcher # Special case for class instance
-                return None # The scraper isn't a blueprint, it's a tool
+                from webscraper import web_searcher
+                return None
             else:
                 return None
             return getattr(mod, blueprint_name) if blueprint_name else mod
@@ -54,7 +49,6 @@ video_bp = safe_import('video_editor', 'video_bp')
 image_bp = safe_import('image_generator', 'image_bp')
 file_bp = safe_import('file_handler', 'file_bp')
 
-# Special handling for Scraper (It might be a blueprint or just a class)
 try:
     from webscraper import scraper_bp
 except ImportError:
@@ -62,6 +56,10 @@ except ImportError:
 
 # --- 5. ENVIRONMENT CONFIG ---
 load_dotenv()
+
+# Set OAUTHLIB_INSECURE_TRANSPORT to 1 for local testing, Render will ignore this if using HTTPS
+if os.getenv('FLASK_ENV') == 'development':
+    os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 logging.basicConfig(
     level=logging.INFO,
@@ -100,6 +98,7 @@ def create_app():
         MAIL_PASSWORD=os.getenv('MAIL_PASSWORD')
     )
 
+    # ProxyFix is essential for Redirect URIs on Render
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
     # ==========================================
@@ -121,7 +120,6 @@ def create_app():
     # ==========================================
     CORS(app)
     db.init_app(app)
-    # Database Migration Engine (Added as requested)
     migrate = Migrate(app, db)
     mail.init_app(app)
     socketio.init_app(app, cors_allowed_origins="*", async_mode='gevent')
@@ -135,11 +133,15 @@ def create_app():
 
     @login_manager.user_loader
     def load_user(user_id):
-        return db.session.get(User, int(user_id))
+        try:
+            return db.session.get(User, int(user_id))
+        except Exception:
+            return None
 
     # ==========================================
     # 10. REGISTER ALL BLUEPRINTS
     # ==========================================
+    # Configure OAuth AFTER app.config is populated
     configure_oauth(app)
     
     blueprints = [
@@ -157,7 +159,7 @@ def create_app():
             app.register_blueprint(bp, url_prefix=prefix)
             logger.info(f"✅ Feature Active: {prefix}")
         elif prefix == '/auth':
-            raise RuntimeError("CRITICAL ERROR: Auth blueprint is mandatory!")
+            logger.error("CRITICAL ERROR: Auth blueprint is missing!")
 
     # ==========================================
     # 11. GLOBAL CORE ROUTES
@@ -165,7 +167,10 @@ def create_app():
     @app.route('/')
     def index():
         if current_user.is_authenticated:
-            return redirect(url_for('chat.interface'))
+            # Check if chat_bp was actually loaded before redirecting
+            if chat_bp:
+                return redirect(url_for('chat.interface'))
+            return "Chat module not loaded", 503
         return render_template('login.html')
 
     @app.route('/system/status')
@@ -175,7 +180,8 @@ def create_app():
             "modules": {
                 "vision": bool(image_bp),
                 "video": bool(video_bp),
-                "scraper": bool(scraper_bp)
+                "scraper": bool(scraper_bp),
+                "auth": bool(auth_bp)
             }
         })
 
@@ -188,8 +194,9 @@ if __name__ == '__main__':
         try:
             db.create_all()
         except Exception as e:
-            print(f"DB Init Note: {e}")
+            logger.warning(f"DB Init Note: {e}")
     
-    # Safe Port Handling (Defaults to 5000 if PORT not set locally)
-    port = int(os.environ["PORT"])
+    # FIXED: Safe Port handling to prevent crash on local/Render
+    port = int(os.environ.get("PORT", 5000))
+    # Note: Use socketio.run instead of app.run for Socket.IO features
     socketio.run(app, host="0.0.0.0", port=port, debug=True)
