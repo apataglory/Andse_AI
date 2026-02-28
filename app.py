@@ -28,7 +28,7 @@ sys.path.append(os.getcwd())
 
 # --- CORE EXTENSIONS & MODELS ---
 from extensions import db, socketio, mail
-from database.models import User, ChatMessage, FileMetadata, UserSettings
+from database.models import User, Message as ChatMessage, FileMetadata, UserSettings
 
 # ==============================================================================
 # ADVANCED FEATURE LOADING ENGINE (STRICT PRESERVATION)
@@ -234,4 +234,5 @@ if __name__ == '__main__':
         debug=os.getenv('DEBUG', 'False') == 'True',
         use_reloader=False # Reloader can interfere with Gevent monkey patching
     )
+
 
