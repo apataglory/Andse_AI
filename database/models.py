@@ -1,4 +1,4 @@
-ssfrom extensions import db
+from extensions import db
 from flask_login import UserMixin
 from datetime import datetime
 import uuid
@@ -82,4 +82,5 @@ class FileMetadata(db.Model):
     file_size = db.Column(db.Integer)
     storage_path = db.Column(db.String(500))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 
