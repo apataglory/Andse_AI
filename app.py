@@ -1,5 +1,5 @@
 # ==============================================================================
-# ANDSE AI | NEURAL CORE ENGINE v4.2.0 (HYBRID STABLE)
+# ANDSE AI | NEURAL CORE ENGINE v4.2.0 (HYBRID STABLE - AUTH REMOVED)
 # ==============================================================================
 
 # --- GEVENT PATCH ---
@@ -17,7 +17,6 @@ import threading
 import signal
 from datetime import datetime
 from flask import Flask, render_template, redirect, url_for, jsonify, request, g
-from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -27,7 +26,6 @@ from sqlalchemy import text
 sys.path.append(os.getcwd())
 
 from extensions import db, socketio, mail
-from database.models import User
 
 
 # ==============================================================================
@@ -84,9 +82,6 @@ def create_massive_app():
         AUDIO_CACHE=os.path.join(app.root_path, 'static', 'audio_cache'),
         VIDEO_CACHE=os.path.join(app.root_path, 'static', 'video_cache'),
 
-        GOOGLE_CLIENT_ID=os.getenv('GOOGLE_CLIENT_ID'),
-        GOOGLE_CLIENT_SECRET=os.getenv('GOOGLE_CLIENT_SECRET'),
-
         MAIL_SERVER='smtp.gmail.com',
         MAIL_PORT=465,
         MAIL_USE_SSL=True,
@@ -112,15 +107,6 @@ def create_massive_app():
         manage_session=False
     )
 
-    # ---------------- LOGIN ----------------
-    login_manager = LoginManager()
-    login_manager.init_app(app)
-    login_manager.login_view = 'auth.login'
-
-    @login_manager.user_loader
-    def load_user(user_id):
-        return db.session.get(User, int(user_id))
-
     # ---------------- PERFORMANCE LOGGING ----------------
     @app.before_request
     def start_timer():
@@ -136,9 +122,7 @@ def create_massive_app():
         return response
 
     # ---------------- BLUEPRINTS ----------------
-    from auth import configure_oauth, auth_bp
-    configure_oauth(app)
-    app.register_blueprint(auth_bp, url_prefix="/auth")
+    # Auth blueprint removed completely
 
     from chat_manager import chat_bp
     app.register_blueprint(chat_bp, url_prefix="/chat")
@@ -152,9 +136,7 @@ def create_massive_app():
     # ---------------- ROOT ROUTES ----------------
     @app.route('/')
     def index():
-        if current_user.is_authenticated:
-            return redirect(url_for('chat.interface'))
-        return render_template('login.html')
+        return redirect(url_for('chat.interface'))
 
     @app.route('/health')
     def health_check():
