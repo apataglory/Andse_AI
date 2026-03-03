@@ -1,5 +1,5 @@
 # ==============================================================================
-# ANDSE AI | NEURAL CORE ENGINE v4.2.0 (HYBRID STABLE - AUTH REMOVED)
+# ANDSE AI | NEURAL CORE ENGINE v4.2.0 (HYBRID STABLE)
 # ==============================================================================
 
 # --- GEVENT PATCH ---
@@ -82,6 +82,9 @@ def create_massive_app():
         AUDIO_CACHE=os.path.join(app.root_path, 'static', 'audio_cache'),
         VIDEO_CACHE=os.path.join(app.root_path, 'static', 'video_cache'),
 
+        GOOGLE_CLIENT_ID=os.getenv('GOOGLE_CLIENT_ID'),
+        GOOGLE_CLIENT_SECRET=os.getenv('GOOGLE_CLIENT_SECRET'),
+
         MAIL_SERVER='smtp.gmail.com',
         MAIL_PORT=465,
         MAIL_USE_SSL=True,
@@ -122,8 +125,6 @@ def create_massive_app():
         return response
 
     # ---------------- BLUEPRINTS ----------------
-    # Auth blueprint removed completely
-
     from chat_manager import chat_bp
     app.register_blueprint(chat_bp, url_prefix="/chat")
 
